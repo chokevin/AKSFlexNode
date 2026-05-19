@@ -18,12 +18,12 @@ import (
 	"log/slog"
 	"net/netip"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/Azure/AKSFlexNode/pkg/config"
-	"github.com/Azure/AKSFlexNode/pkg/utils/utilexec"
 	"github.com/Azure/AKSFlexNode/pkg/utils/utilio"
 	"github.com/Azure/unbounded/pkg/agent/goalstates"
 	"github.com/Azure/unbounded/pkg/agent/phases"
@@ -35,7 +35,7 @@ const (
 
 	// aksFlexNodeConfigDir is the AKSFlexNode configuration directory on the host.
 	// Script files are installed here and referenced by their systemd unit.
-	aksFlexNodeConfigDir = config.ConfigDir
+	aksFlexNodeConfigDir = "/etc/aks-flex-node"
 )
 
 //go:embed assets/static-routes.service
@@ -227,7 +227,7 @@ func writeScriptIfChanged(path string, content []byte) (bool, error) {
 type systemctlRunner func(context.Context, *slog.Logger, ...string) error
 
 func runSystemctl(ctx context.Context, logger *slog.Logger, args ...string) error {
-	return utilexec.RunCmd(ctx, logger, utilexec.Systemctl(), args...)
+	return runCmd(ctx, logger, "systemctl", args...)
 }
 
 // ensureSystemdUnit writes the unit file, daemon-reloads, enables, and starts
@@ -245,25 +245,26 @@ func ensureSystemdUnit(ctx context.Context, logger *slog.Logger, unit string, un
 		}
 	}
 
-	if err := runSystemctl(ctx, logger, "daemon-reload"); err != nil {
+	systemctl := "systemctl"
+	if err := runCmd(ctx, logger, systemctl, "daemon-reload"); err != nil {
 		return fmt.Errorf("systemctl daemon-reload: %w", err)
 	}
 
-	if err := runSystemctl(ctx, logger, "enable", unit); err != nil {
+	if err := runCmd(ctx, logger, systemctl, "enable", unit); err != nil {
 		return fmt.Errorf("systemctl enable %s: %w", unit, err)
 	}
 
 	if unitChanged || restart {
 		// The unit may be active with RemainAfterExit=yes; restart it so the
 		// updated script actually runs.
-		if err := runSystemctl(ctx, logger, "restart", unit); err != nil {
+		if err := runCmd(ctx, logger, systemctl, "restart", unit); err != nil {
 			return fmt.Errorf("systemctl restart %s: %w", unit, err)
 		}
 		return nil
 	}
 
 	// Start for the first time; idempotent if already active.
-	if err := runSystemctl(ctx, logger, "start", unit); err != nil {
+	if err := runCmd(ctx, logger, systemctl, "start", unit); err != nil {
 		return fmt.Errorf("systemctl start %s: %w", unit, err)
 	}
 	return nil
@@ -330,4 +331,18 @@ func fileExists(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// runCmd runs the given command and logs its output via logger.
+func runCmd(ctx context.Context, logger *slog.Logger, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // name is a constant binary path
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if stderr.Len() > 0 {
+			logger.Error(strings.TrimRight(stderr.String(), "\n"), "cmd", name)
+		}
+		return fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+	}
+	return nil
 }

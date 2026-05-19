@@ -106,8 +106,8 @@ func parseRouteOverlapMode(s string) (routeOverlapMode, error) {
 // CIDR, picks a probe address inside the prefix and runs `ip -4 route get
 // <probe>` to ask the kernel which interface that address would actually go out.
 // Any mismatch with the IPv4 default route's interface is logged; in STRICT mode
-// the script then exits 1 and (because the unit is RequiredBy=systemd-nspawn@.service)
-// the nspawn machine does not start.
+// the script then exits 1 and (because the unit is RequiredBy=kubelet.service)
+// kubelet does not start.
 func renderCheckRouteOverlapScript(cidrs []string, mode routeOverlapMode) (string, error) {
 	type entry struct {
 		cidr  string

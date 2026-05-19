@@ -25,8 +25,8 @@ func SetupHost(cfg *config.Config, log *slog.Logger) phases.Task {
 			host.DisableSwap(log),
 			host.HardenAPT(log),
 			arc.InstallArc(cfg, log),
+			hostrouting.Configure(cfg, log),
 		),
-		hostrouting.Configure(cfg, log),
 	)
 }
 
