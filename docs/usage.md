@@ -57,6 +57,44 @@ The VM requires outbound internet connectivity to:
 
 **Note:** No inbound connectivity is required from the internet. All connections are initiated outbound from the VM.
 
+### Host Kernel and Kernel Module Compatibility
+
+AKS Flex Node does not select or pin the host kernel. The agent configures the
+host and runs the Kubernetes node inside systemd-nspawn, so storage and GPU
+kernel modules must already be installable for the VM's running host kernel.
+
+Before enabling node-local storage drivers that install host kernel modules,
+verify package availability for the exact kernel returned by `uname -r`. For
+example, Azure Managed Lustre uses the Azure Lustre CSI node pod to install AMLFS
+Lustre client packages that are versioned for specific Ubuntu Azure kernels. If
+the AMLFS feed does not contain a client package for the running kernel, the CSI
+node pod cannot mount Lustre volumes on that flex node even if the same PVC
+mounts successfully on regular AKS nodes.
+
+For Ubuntu 24.04 GPU nodes, use a kernel version that has both:
+
+1. A working NVIDIA driver module for that exact kernel.
+2. A matching AMLFS Lustre client package in the Microsoft AMLFS feed.
+
+Run this preflight on each host before scheduling Lustre-dependent workloads:
+
+```bash
+set -euxo pipefail
+uname -r
+apt-cache policy linux-image-azure linux-headers-azure | sed -n '1,80p'
+apt-cache policy 'amlfs-lustre-client-*' | sed -n '1,160p'
+dkms status | grep -E "nvidia/.+$(uname -r).+installed"
+nvidia-smi
+```
+
+If the current kernel is unsupported by the AMLFS feed, cordon and drain one
+node at a time, install a kernel that has matching AMLFS and NVIDIA support,
+reboot, and only uncordon after `uname -r`, `nvidia-smi`, kubelet readiness, and
+the Lustre CSI node pod are healthy. Prefer Microsoft AMLFS prebuilt packages for
+the exact running Azure kernel; use AMLFS DKMS only as an explicitly validated
+break-glass path because it adds compiler/header, Secure Boot, and module
+signing failure modes.
+
 ### Azure Permissions
 
 **For Arc Mode:**
