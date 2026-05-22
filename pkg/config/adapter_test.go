@@ -13,8 +13,15 @@ func TestToAgentConfig_BootstrapToken(t *testing.T) {
 		},
 		Kubernetes: KubernetesConfig{Version: "1.30.0"},
 		Node: NodeConfig{
-			Labels: map[string]string{"env": "test"},
-			Taints: []string{"dedicated=infra:NoSchedule"},
+			Labels: map[string]string{
+				"env":                         "test",
+				"rune.ai/compute-class":       "gpu",
+				"rune.ai/gpu-family":          "nvidia-h100",
+				"rune.ai/gpu-count":           "8",
+				"rune.ai/gpu-topology":        "nvlink",
+				"topology.kubernetes.io/zone": "eastus-1",
+			},
+			Taints: []string{"rune.ai/gpu=true:NoSchedule"},
 			Kubelet: KubeletConfig{
 				DNSServiceIP: "10.0.0.10",
 				ServerURL:    "https://api.example.com:6443",
@@ -50,11 +57,24 @@ func TestToAgentConfig_BootstrapToken(t *testing.T) {
 	if ac.Kubelet.Auth.ExecCredential != nil {
 		t.Fatalf("Kubelet.Auth.ExecCredential should be nil for bootstrap token auth")
 	}
-	if len(ac.Kubelet.Labels) != 1 || ac.Kubelet.Labels["env"] != "test" {
-		t.Fatalf("Kubelet.Labels=%v, want map[env:test]", ac.Kubelet.Labels)
+	expectedLabels := map[string]string{
+		"env":                         "test",
+		"rune.ai/compute-class":       "gpu",
+		"rune.ai/gpu-family":          "nvidia-h100",
+		"rune.ai/gpu-count":           "8",
+		"rune.ai/gpu-topology":        "nvlink",
+		"topology.kubernetes.io/zone": "eastus-1",
 	}
-	if len(ac.Kubelet.RegisterWithTaints) != 1 || ac.Kubelet.RegisterWithTaints[0] != "dedicated=infra:NoSchedule" {
-		t.Fatalf("Kubelet.RegisterWithTaints=%v, want [dedicated=infra:NoSchedule]", ac.Kubelet.RegisterWithTaints)
+	if len(ac.Kubelet.Labels) != len(expectedLabels) {
+		t.Fatalf("Kubelet.Labels=%v, want %v", ac.Kubelet.Labels, expectedLabels)
+	}
+	for key, want := range expectedLabels {
+		if ac.Kubelet.Labels[key] != want {
+			t.Fatalf("Kubelet.Labels[%q]=%q, want %q", key, ac.Kubelet.Labels[key], want)
+		}
+	}
+	if len(ac.Kubelet.RegisterWithTaints) != 1 || ac.Kubelet.RegisterWithTaints[0] != "rune.ai/gpu=true:NoSchedule" {
+		t.Fatalf("Kubelet.RegisterWithTaints=%v, want [rune.ai/gpu=true:NoSchedule]", ac.Kubelet.RegisterWithTaints)
 	}
 }
 
