@@ -648,6 +648,45 @@ This approach is more secure than long-lived credentials because:
 2. The node uses a client certificate for all future authentication
 3. Kubelet automatically rotates this certificate (built-in feature since Kubernetes 1.8+)
 
+---
+
+## Prestamping node labels and taints
+
+AKS Flex Node can prestamp arbitrary Kubernetes node labels and taints during node registration through the `node.labels` and `node.taints` config fields. These values are passed through to kubelet at join time and to the AKS Machine registration payload, so scheduling systems such as Kueue can rely on them before admitting workloads.
+
+Use this path for stable infrastructure labels that describe the compute shape of the node. For example, a Rune/Kueue ResourceFlavor can select GPU flex nodes with a small `rune.ai/*` label contract instead of encoding every SKU as a separate user-facing queue.
+
+```json
+{
+  "node": {
+    "labels": {
+      "rune.ai/compute-class": "gpu",
+      "rune.ai/gpu-family": "nvidia-h100",
+      "rune.ai/gpu-count": "8",
+      "rune.ai/gpu-topology": "nvlink",
+      "topology.kubernetes.io/region": "eastus",
+      "topology.kubernetes.io/zone": "eastus-1"
+    },
+    "taints": [
+      "rune.ai/gpu=true:NoSchedule"
+    ],
+    "kubelet": {
+      "serverURL": "$SERVER_URL",
+      "caCertData": "$CA_CERT_DATA"
+    }
+  }
+}
+```
+
+The agent also adds `kubernetes.azure.com/managed=false` by default so Azure cloud-controller-manager treats the node as unmanaged. Topology or inventory controllers may correct labels later, but they should be treated as a backstop; labels required for ResourceFlavor selection should be present in the Flex Node config before bootstrap.
+
+After bootstrap, verify the node carries the expected scheduling contract:
+
+```bash
+kubectl get node <node-name> \
+  -o jsonpath='{.metadata.labels.rune\.ai/gpu-family}{"\n"}{.spec.taints}{"\n"}'
+```
+
 ## Common Operations
 
 ### Available Commands

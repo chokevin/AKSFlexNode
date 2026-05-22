@@ -1179,6 +1179,9 @@ const baseAzureJSON = `{
 			"location": "eastus"
 		}
 	},
+	"agent": {
+		"nodeName": "test-node"
+	},
 	"node": {
 		"kubelet": {
 			"serverURL": "https://test-cluster.hcp.eastus.azmk8s.io:443",
@@ -1248,6 +1251,25 @@ func TestLoadConfigNodeLabels(t *testing.T) {
 			labelsJSON: `{"version": "1.2.3"}`,
 			expectedLabels: map[string]string{
 				"version": "1.2.3",
+			},
+		},
+		{
+			name: "rune gpu resource flavor labels are preserved",
+			labelsJSON: `{
+				"rune.ai/compute-class": "gpu",
+				"rune.ai/gpu-family": "nvidia-h100",
+				"rune.ai/gpu-count": "8",
+				"rune.ai/gpu-topology": "nvlink",
+				"topology.kubernetes.io/region": "eastus",
+				"topology.kubernetes.io/zone": "eastus-1"
+			}`,
+			expectedLabels: map[string]string{
+				"rune.ai/compute-class":         "gpu",
+				"rune.ai/gpu-family":            "nvidia-h100",
+				"rune.ai/gpu-count":             "8",
+				"rune.ai/gpu-topology":          "nvlink",
+				"topology.kubernetes.io/region": "eastus",
+				"topology.kubernetes.io/zone":   "eastus-1",
 			},
 		},
 	}
