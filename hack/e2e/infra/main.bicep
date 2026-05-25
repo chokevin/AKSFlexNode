@@ -23,6 +23,10 @@ param aksNodeVmSize string = 'Standard_B2s'
 @description('Flex node VM size.')
 param vmSize string = 'Standard_B2ms'
 
+@description('Secondary private IP configurations per flex-node NIC for Azure CNI pod IP inventory.')
+@minValue(0)
+param flexNodePodIPInventoryCount int = 32
+
 @description('Admin username for VMs.')
 param adminUsername string = 'azureuser'
 
@@ -150,6 +154,7 @@ module vmMsi 'modules/vm.bicep' = {
     adminUsername: adminUsername
     sshPublicKey: sshPublicKey
     subnetId: vnet.properties.subnets[1].id
+    secondaryPrivateIPAddressCount: flexNodePodIPInventoryCount
     assignManagedIdentity: true
     tags: tags
   }
@@ -164,6 +169,7 @@ module vmToken 'modules/vm.bicep' = {
     adminUsername: adminUsername
     sshPublicKey: sshPublicKey
     subnetId: vnet.properties.subnets[1].id
+    secondaryPrivateIPAddressCount: flexNodePodIPInventoryCount
     assignManagedIdentity: false
     tags: tags
   }
@@ -178,6 +184,7 @@ module vmKubeadm 'modules/vm.bicep' = {
     adminUsername: adminUsername
     sshPublicKey: sshPublicKey
     subnetId: vnet.properties.subnets[1].id
+    secondaryPrivateIPAddressCount: flexNodePodIPInventoryCount
     assignManagedIdentity: false
     tags: tags
   }
@@ -226,4 +233,3 @@ output kubeadmVmName string = vmKubeadm.outputs.vmName
 output kubeadmVmIp string = vmKubeadm.outputs.publicIpAddress
 
 output adminUsername string = adminUsername
-

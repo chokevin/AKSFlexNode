@@ -24,6 +24,15 @@ const (
 	defaultMachineOperationMode     = "auto"
 	defaultAzureCloud               = "AzurePublicCloud"
 	defaultMachineReconcileInterval = 10 * time.Minute
+	defaultCNIMode                  = CNIModeAzure
+)
+
+const (
+	// CNIModeAzure expects the node to use the AKS Azure CNI configuration.
+	CNIModeAzure = "azure"
+	// CNIModeBridge is only for local/E2E tests that intentionally use a
+	// host-local bridge instead of Azure CNI.
+	CNIModeBridge = "bridge"
 )
 
 // Config represents the complete agent configuration structure.
@@ -148,9 +157,14 @@ type KubeletConfig struct {
 	NodeIP               string `json:"nodeIP"`       // IP address to advertise as the node's primary IP (--node-ip kubelet flag)
 }
 
-// CNIPathsConfig holds file system paths related to CNI plugins and configurations.
+// CNIConfig holds CNI plugin settings.
 type CNIConfig struct {
 	Version string `json:"version"`
+	Mode    string `json:"mode,omitempty"`
+}
+
+func (c CNIConfig) InstallsBridgeFallback() bool {
+	return c.Mode == CNIModeBridge
 }
 
 // NPDConfig holds configuration settings for the Node Problem Detector (NPD).
@@ -213,6 +227,7 @@ func (cfg *Config) resolveNodeName() (string, error) {
 	if hostname == "" {
 		return "", fmt.Errorf("host hostname is empty")
 	}
+	hostname = strings.ToLower(hostname)
 	if err := validateNodeName(hostname); err != nil {
 		return "", fmt.Errorf("host hostname: %w", err)
 	}
@@ -270,6 +285,7 @@ func (c *Config) setDefaults() {
 	c.setAzureCloudDefaults()
 	c.setAgentDefaults()
 	c.setNodeDefaults()
+	c.setCNIDefaults()
 	c.setRuncDefaults()
 	c.setNpdDefaults()
 }
@@ -326,6 +342,12 @@ func (c *Config) setNodeDefaults() {
 	// Clusters with custom service CIDRs should specify this value explicitly
 	if c.Node.Kubelet.DNSServiceIP == "" {
 		c.Node.Kubelet.DNSServiceIP = "10.0.0.10"
+	}
+}
+
+func (c *Config) setCNIDefaults() {
+	if c.CNI.Mode == "" {
+		c.CNI.Mode = defaultCNIMode
 	}
 }
 
@@ -490,6 +512,16 @@ func (c *AgentConfig) validate() error {
 	return nil
 }
 
+func (c CNIConfig) validate(e2eMode bool) error {
+	if !validCNIModes[c.Mode] {
+		return fmt.Errorf("invalid cni.mode: %s. Valid values are: azure, bridge", c.Mode)
+	}
+	if c.Mode == CNIModeBridge && !e2eMode {
+		return fmt.Errorf("cni.mode bridge is only supported when agent.e2eMode is true; Azure Flex nodes must use Azure CNI with routable pod IP inventory")
+	}
+	return nil
+}
+
 // validAzureClouds defines the supported Azure cloud environments
 // Currently only Azure Public Cloud is supported
 var validAzureClouds = map[string]bool{
@@ -499,6 +531,11 @@ var validAzureClouds = map[string]bool{
 var validMachineOperationModes = map[string]bool{
 	"auto":    true,
 	"disable": true,
+}
+
+var validCNIModes = map[string]bool{
+	CNIModeAzure:  true,
+	CNIModeBridge: true,
 }
 
 func (c *Config) validate() error {
@@ -512,6 +549,9 @@ func (c *Config) validate() error {
 		return err
 	}
 	if err := c.Agent.validate(); err != nil {
+		return err
+	}
+	if err := c.CNI.validate(c.Agent.E2EMode); err != nil {
 		return err
 	}
 

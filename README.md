@@ -21,6 +21,7 @@ AKS Flex Node transforms any Ubuntu VM into a semi-managed AKS worker node by:
 ## Documentation
 
 - **[Usage Guide](docs/usage.md)** - Installation, configuration, and usage instructions
+- **[Networking Contract](docs/networking.md)** - Azure CNI pod IP inventory, VNet peering, and H100 incident runbook notes
 - **[Design Documentation](docs/design.md)** - System design, data flow, Azure integration, and technical specifications
 - **[Development Guide](docs/development.md)** - Building from source, testing, and contributing
 

@@ -38,14 +38,21 @@ func StartNode(
 ) phases.Task {
 	return phases.Serial(log,
 		rootfs.Provision(log, gs.RootFS),
-		phases.Parallel(log,
-			npd.Download(cfg, gs.RootFS.MachineDir),
-			InstallBinary(gs.RootFS.MachineDir),
-			cni.WriteCNIConfig(gs.RootFS.MachineDir),
-		),
+		phases.Parallel(log, rootfsPrepTasks(cfg, gs.RootFS.MachineDir)...),
 		nodestart.StartNode(log, gs.NodeStart),
 		nodestart.WaitForKubelet(log, machineName),
 		npd.Start(cfg, log, gs.RootFS.MachineDir, machineName),
 		saveState(store, state),
 	)
+}
+
+func rootfsPrepTasks(cfg *config.Config, machineDir string) []phases.Task {
+	tasks := []phases.Task{
+		npd.Download(cfg, machineDir),
+		InstallBinary(machineDir),
+	}
+	if cfg.CNI.InstallsBridgeFallback() {
+		tasks = append(tasks, cni.WriteBridgeConfig(machineDir))
+	}
+	return tasks
 }

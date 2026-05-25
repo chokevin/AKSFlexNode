@@ -201,8 +201,9 @@ smoke_test_all() {
   token_vm_name="$(state_get token_vm_name)"
   kubeadm_vm_name="$(state_get kubeadm_vm_name)"
 
-  # A default bridge CNI config (99-bridge.conf) is written during bootstrap,
-  # making nodes Ready without requiring unbounded-net-node DaemonSet.
+  # Local E2E configs explicitly opt into bridge CNI mode, making nodes Ready
+  # without requiring unbounded-net-node DaemonSet. Production Azure CNI nodes
+  # must not use this host-local fallback.
   local failed=0
   smoke_test "${msi_vm_name}" "msi" || failed=1
   smoke_test "${token_vm_name}" "token" || failed=1

@@ -55,7 +55,9 @@ The VM requires outbound internet connectivity to:
   - Azure Arc services (if Arc mode enabled)
 - **Container Registries:** Container image pulls (mcr.microsoft.com, etc.)
 
-**Note:** No inbound connectivity is required from the internet. All connections are initiated outbound from the VM.
+For AKS clusters using Azure CNI, Flex node pod IPs must be allocated from routable Azure NIC secondary private IP configurations. If the Flex node is in a separate VNet, the AKS VNet and Flex VNet must be peered bidirectionally with forwarded traffic enabled, and NSGs/routes must allow kubelet TCP `10250` plus workload traffic from AKS worker subnets to Flex node and pod IPs. Do not use a `10.244.x.x` host-local bridge fallback for production Azure CNI nodes. See the [Networking Contract](networking.md) for the full checklist and H100 incident runbook.
+
+**Note:** No inbound connectivity is required from the internet. Required inbound traffic is private VNet traffic from the AKS control plane/workers to kubelet and pod IPs.
 
 ### Azure Permissions
 
@@ -135,6 +137,9 @@ tee /etc/aks-flex-node/config.json > /dev/null << 'EOF'
   "agent": {
     "logLevel": "info",
     "logDir": "/var/log/aks-flex-node"
+  },
+  "cni": {
+    "mode": "azure"
   }
 }
 EOF

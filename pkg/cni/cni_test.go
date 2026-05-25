@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-func TestWriteCNIConfig_CreatesFile(t *testing.T) {
+func TestWriteBridgeConfig_CreatesFile(t *testing.T) {
 	t.Parallel()
 
 	machineDir := t.TempDir()
-	task := WriteCNIConfig(machineDir)
+	task := WriteBridgeConfig(machineDir)
 
-	if task.Name() != "write-cni-config" {
+	if task.Name() != "write-bridge-cni-config" {
 		t.Fatalf("unexpected task name: %s", task.Name())
 	}
 
@@ -32,11 +32,11 @@ func TestWriteCNIConfig_CreatesFile(t *testing.T) {
 	}
 }
 
-func TestWriteCNIConfig_Idempotent(t *testing.T) {
+func TestWriteBridgeConfig_Idempotent(t *testing.T) {
 	t.Parallel()
 
 	machineDir := t.TempDir()
-	task := WriteCNIConfig(machineDir)
+	task := WriteBridgeConfig(machineDir)
 
 	// Run twice — second call should be a no-op.
 	if err := task.Do(context.Background()); err != nil {

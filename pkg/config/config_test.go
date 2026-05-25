@@ -23,6 +23,7 @@ func TestSetDefaults(t *testing.T) {
 					c.Agent.LogLevel == "info" &&
 					c.Agent.LogDir == "/var/log/aks-flex-node" &&
 					c.Agent.MachineOperationMode == "auto" &&
+					c.CNI.Mode == "azure" &&
 					c.Node.MaxPods == 110 &&
 					c.Runc.Version == "1.1.12"
 			},
@@ -163,6 +164,30 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "azure.subscriptionId is required",
+		},
+		{
+			name: "invalid CNI mode fails",
+			config: validBootstrapConfig(func(c *Config) {
+				c.CNI.Mode = "host-local"
+			}),
+			wantErr: true,
+			errMsg:  "invalid cni.mode",
+		},
+		{
+			name: "bridge CNI mode outside E2E fails",
+			config: validBootstrapConfig(func(c *Config) {
+				c.CNI.Mode = CNIModeBridge
+			}),
+			wantErr: true,
+			errMsg:  "cni.mode bridge is only supported when agent.e2eMode is true",
+		},
+		{
+			name: "bridge CNI mode in E2E passes",
+			config: validBootstrapConfig(func(c *Config) {
+				c.Agent.E2EMode = true
+				c.CNI.Mode = CNIModeBridge
+			}),
+			wantErr: false,
 		},
 		{
 			name: "missing tenant ID fails",
@@ -327,6 +352,36 @@ func TestValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func validBootstrapConfig(mutators ...func(*Config)) *Config {
+	cfg := &Config{
+		Azure: AzureConfig{
+			SubscriptionID: "12345678-1234-1234-1234-123456789012",
+			TenantID:       "12345678-1234-1234-1234-123456789012",
+			Cloud:          "AzurePublicCloud",
+			BootstrapToken: &BootstrapTokenConfig{
+				Token: "abcdef.0123456789abcdef",
+			},
+			TargetCluster: &TargetClusterConfig{
+				ResourceID: "/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-cluster",
+				Location:   "eastus",
+			},
+		},
+		Agent: AgentConfig{
+			LogLevel: "info",
+		},
+		Node: NodeConfig{
+			Kubelet: KubeletConfig{
+				ServerURL:  "https://test-cluster-abc123.hcp.eastus.azmk8s.io:443",
+				CACertData: "LS0tLS1CRUdJTi1DRVJUSUZJQ0FURS0tLS0tCk1JSUREekNDQWZlZ0F3SUJBZ0lSQU1kbzBZa0R",
+			},
+		},
+	}
+	for _, mutate := range mutators {
+		mutate(cfg)
+	}
+	return cfg
 }
 
 func TestLoadConfig(t *testing.T) {

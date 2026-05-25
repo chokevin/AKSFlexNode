@@ -312,6 +312,7 @@ node_join_kubeadm() {
     "logDir": "/var/log/aks-flex-node",
     "e2eMode": true
   },
+  "cni": { "mode": "bridge" },
   "kubernetes": { "version": "${E2E_KUBERNETES_VERSION}" },
   "containerd": { "version": "${E2E_CONTAINERD_VERSION}" },
   "runc": { "version": "${E2E_RUNC_VERSION}" }

@@ -24,6 +24,10 @@ param sshPublicKey string
 @description('Subnet resource ID to attach the NIC to.')
 param subnetId string
 
+@description('Number of secondary private IP configurations to attach to the NIC for Azure CNI pod IP inventory.')
+@minValue(0)
+param secondaryPrivateIPAddressCount int = 0
+
 @description('Whether to assign a system-assigned managed identity to the VM.')
 param assignManagedIdentity bool = false
 
@@ -41,6 +45,17 @@ param imageVersion string = 'latest'
 
 @description('Tags applied to all resources in this module.')
 param tags object = {}
+
+var secondaryPrivateIPConfigurations = [for i in range(0, secondaryPrivateIPAddressCount): {
+  name: 'pod-ip-${i + 1}'
+  properties: {
+    subnet: {
+      id: subnetId
+    }
+    privateIPAllocationMethod: 'Dynamic'
+    primary: false
+  }
+}]
 
 // ---------------------------------------------------------------------------
 // Public IP
@@ -63,7 +78,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-11-01' = {
   location: location
   tags: tags
   properties: {
-    ipConfigurations: [
+    ipConfigurations: concat([
       {
         name: 'ipconfig1'
         properties: {
@@ -74,9 +89,10 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-11-01' = {
             id: pip.id
           }
           privateIPAllocationMethod: 'Dynamic'
+          primary: true
         }
       }
-    ]
+    ], secondaryPrivateIPConfigurations)
   }
 }
 
